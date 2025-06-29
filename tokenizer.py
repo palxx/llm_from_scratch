@@ -68,5 +68,5 @@ pos_embeddings = pos_embedding_layer(torch.arange(context_length))
 print(pos_embeddings())
 print(token_embedding)
 print(token_embedding+pos_embeddings)
-#
+#@
 
