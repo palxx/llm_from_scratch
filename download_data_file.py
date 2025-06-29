@@ -16,3 +16,4 @@ inte = tokenizer.encode(text, allowed_special={"<|endoftext|>"})
 print(inte)
 d = tokenizer.decode(inte)
 print(d)
+#main
