@@ -42,6 +42,8 @@ ids1= tokenizerIns.encode(text_total)
 dids1 = tokenizerIns.decode(ids1)
 print(ids1)
 print(dids1)
+
+
     
 
 
