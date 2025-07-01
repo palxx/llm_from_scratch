@@ -102,6 +102,7 @@ class Multihead_Attention_Main(nn.Module):
         attn_wei = torch.softmax((attn_scores/keys.shape[-1]**0.5), dim = -1)
         context_vec = attn_wei @ values
         context_vec = context_vec.transpose(1,2)
+        context_vec = context_vec.contiguous().view(b, tokens, self.d_out)
         context_vec = self.out_proj(context_vec)
         return context_vec
     
