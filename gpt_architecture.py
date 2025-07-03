@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 import tiktoken
 torch.manual_seed(123)
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+#print(device)
 
 class GPTModel(nn.Module):
     def __init__(self, cfg):
@@ -10,13 +12,14 @@ class GPTModel(nn.Module):
         self.pos_emd = nn.Embedding(cfg["context_length"], cfg["emd_dim"])
         self.drop_emd = nn.Dropout(cfg['drop_rate'])
         self.trf_blocks = nn.Sequential(
-            *[transformerBlock(cfg) for _ in range(cfg["n_heads"])]
+            *[transformerBlock(cfg) for _ in range(cfg["n_layers"])]
         )
         self.final_norm = LayerNorm(cfg["emd_dim"])
         self.out_head = nn.Linear(cfg["emd_dim"], cfg["vocab_size"], bias=False)
 
     def forward(self, x):
         batch_size, seq_len = x.shape
+        #print(x.device)
         tok_emd = self.token_embd(x)
         pos_emd = self.pos_emd(torch.arange(seq_len, device=x.device))
         all_tok = tok_emd+pos_emd
@@ -156,7 +159,20 @@ def print_grad(model, x):
         if "weight" in name:
             print(f"{name} haa a gradient mean of {param.grad.abs().mean()}")
 
-CONFIG_124PARAM = {
+def generate_text_simple(model, idx, max_new_tokns, context_size):
+    for _ in range(max_new_tokns):
+        idx_cond = idx[:, -context_size:]
+        with torch.no_grad():
+            logits = model(idx_cond)
+
+        logits = logits[:, -1, :]
+        probs = torch.softmax(logits, dim=-1)
+        idx_next = torch.argmax(probs, dim=-1, keepdim=True)
+        idx = torch.cat((idx, idx_next), dim=-1)
+
+    return idx
+
+CONFIG_124_SMALL_PARAM = {
     "vocab_size":50257,
     "context_length":1024,
     "emd_dim":768,
@@ -165,16 +181,47 @@ CONFIG_124PARAM = {
     "drop_rate":0.1,
     "qkv_bias":False
 }   
+#calculate parameters in each GPT models
+CONFIG_MED_PARAM = {
+    "vocab_size":50257,
+    "context_length":1024,
+    "emd_dim":1024,
+    "n_heads" :16,
+    "n_layers":24,
+    "drop_rate":0.1,
+    "qkv_bias":False
+}  
+
+CONFIG_LARGE_PARAM = {
+    "vocab_size":50257,
+    "context_length":1024,
+    "emd_dim":1280,
+    "n_heads" :20,
+    "n_layers":36,
+    "drop_rate":0.1,
+    "qkv_bias":False
+}
+
+CONFIG_XL_PARAM = {
+    "vocab_size":50257,
+    "context_length":1024,
+    "emd_dim":1600,
+    "n_heads" :25,
+    "n_layers":48,
+    "drop_rate":0.1,
+    "qkv_bias":False
+}
 
 tokenizer = tiktoken.get_encoding("gpt2")
 batch = []
 txt1 = "Every effort moves you"
 txt2 = "Every day holds a"
 
-batch.append(torch.tensor(tokenizer.encode(txt1), dtype=float))
-batch.append(torch.tensor(tokenizer.encode(txt2), dtype=float))
+batch.append(torch.tensor(tokenizer.encode(txt1)))
+batch.append(torch.tensor(tokenizer.encode(txt2)))
 
 batch = torch.stack(batch, dim=0)
+#batch.to(device)
 
 # model = GPTModel(CONFIG_124PARAM)
 # logits = model(batch)
@@ -188,7 +235,7 @@ batch = torch.stack(batch, dim=0)
 # ffn = FeedForward(CONFIG_124PARAM)
 # x = torch.rand(2,3,768)
 # out = ffn(x)
-# print(out.shape)
+# print(sum(p.numel() for p in ffn.parameters()))
 
 # layer_sizes = [3,3,3,3,3,1]
 # sam_in = torch.tensor([[1., 0.,-1.]])
@@ -196,8 +243,41 @@ batch = torch.stack(batch, dim=0)
 # model_wot_sc = ExDeepNeuralNetwork(layer_sizes, use_shortcut=True)
 # print_grad(model_wot_sc, sam_in)
 
-x = torch.rand(2,4,768)
-block = transformerBlock(CONFIG_124PARAM)
-outt = block(x)
-print("Input shape: ", x.shape)
-print("Output : ", outt.shape)
+# x = torch.rand(2,4,768)
+# block = transformerBlock(CONFIG_124PARAM)
+# outt = block(x)
+# print("Input shape: ", x.shape)
+# print("Output : ", outt.shape)
+
+# model = GPTModel(CONFIG_124_SMALL_PARAM)
+#model.cuda()
+# out = model(batch)
+# total_params = sum(p.numel() for p in model.parameters())
+# total_params2 = (total_params - sum(p.numel() for p in model.out_head.parameters()))
+# print(f"Total number of param: {total_params:,}")
+# print('Input Batch:', batch)
+# print('Output shape:', out.shape)
+# print("token emdedding layer: ", model.token_embd.weight.shape)
+# print("out layer shape: ", model.out_head.weight.shape)
+# print(f"Number of trainable param considering weight typing: {total_params2}")
+# total_size_b = total_params * 4
+# total_size_mb = total_size_b / (1024 * 1024)
+# print(f"total size of the model: {total_size_mb:.2f} MB")
+#print(out[-1,-1,:].shape)
+# probablities = torch.softmax(out[-1,-1,:], dim=0)
+# ele, index = torch.max(probablities, dim=0)
+# print(ele, index)
+# print(tokenizer.decode([index.item()]))
+
+
+# start_context = "hello, i am"
+# encoded = tokenizer.encode(start_context)
+# print("encoded: ", encoded)
+# encoded_tensor = torch.tensor(encoded).unsqueeze(0)
+# print("encoded tensor shape", encoded_tensor.shape)
+
+# model.eval()
+# out = generate_text_simple(model, encoded_tensor, 6, CONFIG_124_SMALL_PARAM['context_length'])
+# print("output: ",out)
+# print("output length: ", tokenizer.decode(out.squeeze(0).tolist()))
+
